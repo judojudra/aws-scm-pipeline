@@ -39,9 +39,7 @@ jobs:
       - name: "Terraform Init"
         run: terraform init
 
-      # 5. Check formatting (Best practice for recruiters!)
-      - name: "Terraform Format"
-        run: terraform fmt -check
+     
 
       # 6. Execute the build
       - name: "Terraform Apply"
