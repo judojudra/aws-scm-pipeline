@@ -9,23 +9,108 @@ terraform {
 }
 
 provider "aws" {
-  region = "us-east-1" # Ensure this matches your console view [cite: 32]
+  region = "us-east-1"
 }
 
-# 2. Capture Layer: S3 Bucket [cite: 3, 7]
+# 2. Capture Layer: S3 Bucket
 resource "aws_s3_bucket" "data_capture" {
-  bucket = "naars-event-driven-capture-2025" 
-  # This bucket name must be unique across all of AWS.
+  bucket = "naars-event-driven-capture-2025"
 }
 
-# 3. Storage Layer: DynamoDB Table [cite: 3, 21]
+# 3. Storage Layer: DynamoDB Table
 resource "aws_dynamodb_table" "data_storage" {
-  name           = "DailyDataLog"
-  billing_mode   = "PAY_PER_REQUEST" # Scalability choice [cite: 25]
-  hash_key       = "TransactionID"
+  name         = "DailyDataLog"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "TransactionID"
 
   attribute {
     name = "TransactionID"
     type = "S"
   }
+}
+
+# 4. IAM Role for Lambda
+resource "aws_iam_role" "lambda_role" {
+  name = "scm_lambda_execution_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "lambda.amazonaws.com"
+      }
+    }]
+  })
+}
+
+# 5. IAM Policy Attachments
+resource "aws_iam_role_policy_attachment" "lambda_basic" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_s3" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess"
+}
+
+# 6. Package Lambda Code
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  source_file = "lambda_function.py"
+  output_path = "lambda_function.zip"
+}
+
+# 7. Lambda Function
+resource "aws_lambda_function" "scm_processor" {
+  filename         = data.archive_file.lambda_zip.output_path
+  function_name    = "ScmProcessorV2"
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "lambda_function.lambda_handler"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  runtime          = "python3.12"
+  timeout          = 30
+  memory_size      = 128
+}
+
+# 8. S3 Permission to Invoke Lambda
+resource "aws_lambda_permission" "s3_invoke" {
+  statement_id  = "AllowS3Invoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.scm_processor.function_name
+  principal     = "s3.amazonaws.com"
+  source_arn    = aws_s3_bucket.data_capture.arn
+}
+
+# 9. S3 Event Trigger
+resource "aws_s3_bucket_notification" "csv_trigger" {
+  bucket = aws_s3_bucket.data_capture.id
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.scm_processor.arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_suffix       = ".csv"
+  }
+
+  depends_on = [aws_lambda_permission.s3_invoke]
+}
+
+# 10. Outputs
+output "s3_bucket_name" {
+  value = aws_s3_bucket.data_capture.id
+}
+
+output "dynamodb_table_name" {
+  value = aws_dynamodb_table.data_storage.name
+}
+
+output "lambda_function_name" {
+  value = aws_lambda_function.scm_processor.function_name
 }
