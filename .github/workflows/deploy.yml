@@ -3,31 +3,31 @@ name: "Terraform Logistics Deploy"
 on:
   push:
     branches:
-      - main # Triggers only when you push to the main branch
-  workflow_dispatch: # Allows you to trigger the build manually for the demo
+      - main 
+  workflow_dispatch: 
 
 jobs:
   terraform:
     name: "Build Infrastructure"
     runs-on: ubuntu-latest
     
-    # Permission needed for OIDC if you ever upgrade, but good practice now
+    
     permissions:
       id-token: write
       contents: read
 
     steps:
-      # 1. Pull your code into the runner
+     
       - name: "Checkout Code"
         uses: actions/checkout@v4
 
-      # 2. Install the Terraform CLI
+      
       - name: "Setup Terraform"
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.5.0" # Matches your local environment
 
-      # 3. Authenticate with AWS using your 3 Secrets
+     
       - name: "Configure AWS Credentials"
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -35,13 +35,9 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # 4. Initialize the Terraform backend
+      
       - name: "Terraform Init"
         run: terraform init
 
-     
-
-      # 6. Execute the build
       - name: "Terraform Apply"
-        # -auto-approve is critical so the pipeline doesn't wait for a human to type 'yes'
         run: terraform apply -auto-approve
