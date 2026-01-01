@@ -14,7 +14,7 @@ provider "aws" {
 
 # 2. Capture Layer: S3 Bucket
 resource "aws_s3_bucket" "data_capture" {
-  bucket = "naars-event-driven-capture-2025"
+  bucket = "naars-event-driven-capture-2026"
 }
 
 # 3. Storage Layer: DynamoDB Table
