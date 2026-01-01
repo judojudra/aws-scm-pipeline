@@ -1,4 +1,4 @@
-# 1. Provider Configuration 
+
 terraform {
   required_providers {
     aws = {
@@ -12,12 +12,12 @@ provider "aws" {
   region = "us-east-1"
 }
 
-# 2. Capture Layer: S3 Bucket
+
 resource "aws_s3_bucket" "data_capture" {
   bucket = "naars-event-driven-capture-2026"
 }
 
-# 3. Storage Layer: DynamoDB Table
+
 resource "aws_dynamodb_table" "data_storage" {
   name         = "DailyDataLog"
   billing_mode = "PAY_PER_REQUEST"
@@ -29,7 +29,7 @@ resource "aws_dynamodb_table" "data_storage" {
   }
 }
 
-# 4. IAM Role for Lambda
+
 resource "aws_iam_role" "lambda_role" {
   name = "scm_lambda_execution_role"
 
@@ -45,7 +45,7 @@ resource "aws_iam_role" "lambda_role" {
   })
 }
 
-# 5. IAM Policy Attachments
+
 resource "aws_iam_role_policy_attachment" "lambda_basic" {
   role       = aws_iam_role.lambda_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
@@ -61,14 +61,14 @@ resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess"
 }
 
-# 6. Package Lambda Code
+
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_file = "lambda_function.py"
   output_path = "lambda_function.zip"
 }
 
-# 7. Lambda Function
+
 resource "aws_lambda_function" "scm_processor" {
   filename         = data.archive_file.lambda_zip.output_path
   function_name    = "ScmProcessorV2"
@@ -80,7 +80,7 @@ resource "aws_lambda_function" "scm_processor" {
   memory_size      = 128
 }
 
-# 8. S3 Permission to Invoke Lambda
+
 resource "aws_lambda_permission" "s3_invoke" {
   statement_id  = "AllowS3Invoke"
   action        = "lambda:InvokeFunction"
@@ -89,7 +89,7 @@ resource "aws_lambda_permission" "s3_invoke" {
   source_arn    = aws_s3_bucket.data_capture.arn
 }
 
-# 9. S3 Event Trigger
+
 resource "aws_s3_bucket_notification" "csv_trigger" {
   bucket = aws_s3_bucket.data_capture.id
 
@@ -102,7 +102,7 @@ resource "aws_s3_bucket_notification" "csv_trigger" {
   depends_on = [aws_lambda_permission.s3_invoke]
 }
 
-# 10. Outputs
+
 output "s3_bucket_name" {
   value = aws_s3_bucket.data_capture.id
 }
